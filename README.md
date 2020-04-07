@@ -31,7 +31,7 @@ mdl <- mcLMM::mc_mle(Y, X)
 ```
 
 ```r
-mdl <- mcLMM::REMLE(Y, X)
+mdl <- mcLMM::mc_remle(Y, X)
 ```
 
 where Y is the response variable encoded as a matrix with individuals as rows and contexts as columns, X is the covariate matrix with individuals as rows and covariates as columns. These functions return a list of the LMM parameters (variance components and estimated covariate coefficients with 'uncorrelated' standard errors')

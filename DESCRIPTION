@@ -1,0 +1,12 @@
+Package: mcLMM
+Title: Ultra-fast association testing across multiple contexts with linear mixed models
+Version: 1.0.0
+Authors@R: c(
+  person(given = 'Brandon', family = 'Jew', email = 'brandon.jew@ucla.edu', role = c('aut', 'cre'))
+  )
+Description: Provides functions to fit a multi-context linear mixed model in linear time using 
+             maximum likelihood or restricted maximum likelihood estimation.
+Depends: R (>= 3.5.0)
+License: GPL-3
+Encoding: UTF-8
+RoxygenNote: 7.0.2

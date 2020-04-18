@@ -86,12 +86,14 @@ mle_get_params <- function(d, const){
   vg <- R/ns/d
   ve <- d * vg
   C <- C/ve
-  b.stderr <- 1/rowSums(C)
+  b.stderr <- sqrt(1/rowSums(C))
   b <- as.vector(B %*% YHX)
   beta <- cbind(b, b.stderr)
+  rownames(B) <- b.names
+  colnames(B) <- b.names
   rownames(beta) <- b.names
   colnames(beta) <- c("Estimate", "StandardError")
-  return(list(ve=ve, vg=vg, coef=beta))
+  return(list(ve=ve, vg=vg, coef=beta, b.cov=B))
 }
 
 #' Calculate optimal variance component REMLE estimates given delta
@@ -123,12 +125,14 @@ remle_get_params <- function(d, const){
   vg <- R/(ns-ntc)/d
   ve <- d * vg
   C <- C/ve
-  b.stderr <- 1/rowSums(C)
+  b.stderr <- sqrt(1/rowSums(C))
   b <- as.vector(B %*% YHX)
   beta <- cbind(b, b.stderr)
+  rownames(B) <- b.names
+  colnames(B) <- b.names
   rownames(beta) <- b.names
   colnames(beta) <- c("Estimate", "StandardError")
-  return(list(ve=ve, vg=vg, coef=beta))
+  return(list(ve=ve, vg=vg, coef=beta, b.cov=B))
 }
 
 #' Calculate constants independent of delta in MLE and REMLE likelihoods

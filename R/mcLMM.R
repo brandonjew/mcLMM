@@ -71,8 +71,6 @@ mle_get_params <- function(d, const){
   list2env(const, env=environment())
   d.vec <- g.sizes + d
   B[upper.tri(B, diag=TRUE)] <- E - colSums(D/d.vec)
-  C <- B
-  C[lower.tri(C, diag=FALSE)] <- t(C)[lower.tri(C, diag=FALSE)]
   # We assume chol() only uses upper.tri (things will break if it doesn't)
   B <- chol2inv(chol(B))
   YHX <- sxy - colSums(gxsy/d.vec)
@@ -85,8 +83,7 @@ mle_get_params <- function(d, const){
   R <- YHY - YHXBXHY
   vg <- R/ns/d
   ve <- d * vg
-  C <- C/ve
-  b.stderr <- sqrt(1/rowSums(C))
+  b.stderr <- sqrt(diag(B)*ve)
   b <- as.vector(B %*% YHX)
   beta <- cbind(b, b.stderr)
   rownames(B) <- b.names
@@ -109,9 +106,6 @@ remle_get_params <- function(d, const){
   list2env(const, env=environment())
   d.vec <- g.sizes + d
   B[upper.tri(B, diag=TRUE)] <- E - colSums(D/d.vec)
-  B[lower.tri(B, diag=FALSE)] <- B[upper.tri(B,diag=FALSE)]
-  C <- B
-  C[lower.tri(C, diag=FALSE)] <- t(C)[lower.tri(C, diag=FALSE)]
   # We assume chol() only uses upper.tri (things will break if it doesn't)
   B <- chol2inv(chol(B))
   YHX <- sxy - colSums(gxsy/d.vec)
@@ -124,15 +118,57 @@ remle_get_params <- function(d, const){
   R <- YHY - YHXBXHY
   vg <- R/(ns-ntc)/d
   ve <- d * vg
-  C <- C/ve
-  b.stderr <- sqrt(1/rowSums(C))
+  b.stderr <- sqrt(diag(B)*ve)
   b <- as.vector(B %*% YHX)
   beta <- cbind(b, b.stderr)
   rownames(B) <- b.names
   colnames(B) <- b.names
   rownames(beta) <- b.names
   colnames(beta) <- c("Estimate", "StandardError")
-  return(list(ve=ve, vg=vg, coef=beta, b.cov=B))
+  return(list(ve=ve, vg=vg, coef=beta, b.cor=cov2cor(B)))
+}
+
+#' Calculate optimal variance component REMLE estimates given delta using Lin
+#' and Sullivan approach or standard for Meta-Tissue
+#' 
+#' @param d Value of delta to evaluate
+#' @param const A named list of constants used to calculate parameters as
+#'              described in documentation of \code{get_constants}. These
+#'              variables are loaded into the environment with \code{list2env}.
+#' @return A list with ve in slot \code{ve}, vg in slot \code{vg}, 
+#'         estimated effect sizes and uncorrelated standard errors
+#'         in slot \code{coef}.
+remle_get_params_meta <- function(d, const, newRE=TRUE){
+  list2env(const, env=environment())
+  d.vec <- g.sizes + d
+  B[upper.tri(B, diag=TRUE)] <- E - colSums(D/d.vec)
+  # We assume chol() only uses upper.tri (things will break if it doesn't)
+  B <- chol2inv(chol(B))
+  YHX <- sxy - colSums(gxsy/d.vec)
+  YHY <- sy2 - sum(syi2g/d.vec)
+  YHXBXHY <- sum((YHX^2)*diag(B)) + 2*(sum(sapply(1:((ntc)-1), function(i){
+    sum(sapply((i+1):(ntc), function(j){
+      YHX[i]*YHX[j]*B[i,j]
+    }))
+  }))) 
+  R <- YHY - YHXBXHY
+  vg <- R/(ns-ntc)/d
+  ve <- d * vg
+  if (newRE){
+    b.stderr <- sqrt(diag(B)*ve)[(ntc-nt+1):ntc]
+  }
+  else {
+    C <- chol2inv(chol((B*ve)[(ntc-nt+1):ntc,(ntc-nt+1):ntc]))
+    b.stderr <- 1/sqrt(rowSums(C))
+  }
+  b <- as.vector(B %*% YHX)
+  beta <- cbind(b[(ntc-nt+1):ntc], b.stderr)
+  rownames(B) <- b.names
+  colnames(B) <- b.names
+  rownames(beta) <- b.names[(ntc-nt+1):ntc]
+  colnames(beta) <- c("Estimate", "StandardError")
+  return(list(ve=ve, vg=vg, coef=beta, 
+              b.cor=cov2cor(B)[(ntc-nt+1):ntc,(ntc-nt+1):ntc]))
 }
 
 #' Calculate constants independent of delta in MLE and REMLE likelihoods
@@ -144,10 +180,11 @@ remle_get_params <- function(d, const){
 #' @return A list of named constants. These constants are difficult to
 #'         describe briefly. See Jew et al, 2020 for a more in-depth 
 #'         discussion of these constants. \code{ns} is the total number of 
-#'         measured responses. \code{ni} is the number of individuals.
-#'         \code{ntc} is the number of measurement contexts multiplied
-#'         by the number of covariates. \code{g.sizes} is a vector of 
-#'         the unique number of measurements across all individuals.
+#'         measured responses. \code{nt} is the number of contexts.
+#'         \code{ni} is the number of individuals. \code{nc} is the number
+#'         of covariates. \code{ntc} is the number of measurement contexts 
+#'         multiplied by the number of covariates. \code{g.sizes} is a vector
+#'         of the unique number of measurements across all individuals.
 #'         \code{g.ind.sizes} is a vector of the number of individuals
 #'         that have a certain number of measurements. \code{B} is a dummy
 #'         matrix that will store the inverse of XHX (beta hat covariance).
@@ -267,8 +304,9 @@ get_constants <- function(Y,X){
     }))
   }))
   B <- matrix(nrow=ntc, ncol=ntc)
-  return(list(ns=ns, ni=ni, ntc=ntc, g.sizes=g.sizes, g.ind.sizes=g.ind.sizes,
-              B=B, D=D, E=E, sxy=sxy, gxsy=gxsy, sy2=sy2, syi2g=syi2g,
+  return(list(ns=ns, ni=ni, nt=nt, ntc=ntc, nc=nc, g.sizes=g.sizes, 
+              g.ind.sizes=g.ind.sizes, B=B, D=D, E=E, sxy=sxy, 
+              gxsy=gxsy, sy2=sy2, syi2g=syi2g,
               b.names=b.names))
 }
 
@@ -278,16 +316,10 @@ get_constants <- function(Y,X){
 #'          Missing measurements must be NA
 #' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
 #'          individuals and \code{c} covariates. 
-#' @param G Matrix with \code{n} rows and \code{m} columns for \code{n}
-#'          individuals and \code{m} covariates that will be marginally
-#'          tested (A separate LMM will be fit for each column of G by 
-#'          appending this column to X for each model). This provides
-#'          a modest speedup compared to rerunning this function with
-#'          each feature in G separately. 
 #' @return List of MLE parameters in slots \code{delta}, \code{ve},
 #'         and \code{vg}.
 #' @export
-mc_mle <- function(Y, X, G=NULL){
+mc_mle <- function(Y, X){
   const <- get_constants(Y,X)
   d <- stats::optimize(f=mle_nll, interval=c(exp(-10), exp(10)), const)$minimum
   est.params <- mle_get_params(d, const)
@@ -300,18 +332,67 @@ mc_mle <- function(Y, X, G=NULL){
 #'          Missing measurements must be NA
 #' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
 #'          individuals and \code{c} covariates. 
-#' @param G Matrix with \code{n} rows and \code{m} columns for \code{n}
-#'          individuals and \code{m} covariates that will be marginally
-#'          tested (A separate LMM will be fit for each column of G by 
-#'          appending this column to X for each model). This provides
-#'          a modest speedup compared to rerunning this function with
-#'          each feature in G separately. 
 #' @return List of REMLE parameters in slots \code{delta}, \code{ve},
 #'         and \code{vg}.
 #' @export
-mc_remle <- function(Y, X, G=NULL){
+mc_remle <- function(Y, X){
   const <- get_constants(Y,X)
   d <- stats::optimize(f=remle_nll, interval=c(exp(-10), exp(10)), const)$minimum
   est.params <- remle_get_params(d, const)
   return(est.params)
+}
+
+meta_tissue <- function(Y, X, heuristic=FALSE, newRE=TRUE){
+  Y <- scale(Y)
+  const <- get_constants(Y,X)
+  ntc <- const$ntc
+  nt <- const$nt
+  nc <- const$nc
+  d <- stats::optimize(f=remle_nll, interval=c(exp(-10), exp(10)), const)$minimum
+  est.params <- remle_get_params_meta(d, const, newRE)
+  beta <- est.params$coef
+  corr <- est.params$b.cor
+  if (!newRE){
+    corr <- NULL
+  }
+  if (heuristic){
+    # Run separate OLS
+    separate.std <- sapply(1:ncol(Y), function(i){
+      separate.Y <- Y[,i]
+      indices <- !is.na(separate.Y)
+      separate.Y <- separate.Y[indices]
+      separate.X <- X[indices,,drop=F]
+      sqrt(diag(vcov(lm(separate.Y~separate.X +0))))[nc]
+    })
+    # Run combined OLS (This can probably be sped up with some same tricks used for EMMA)
+    combined.Y <- as.vector(t(Y))
+    combined.Y <- combined.Y[!is.na(combined.Y)]
+    combined.base.X <- matrix(0,nrow=length(combined.Y),ncol=ncol(Y))
+    cur.row <- 1
+    cur.col <- 1
+    for (i in 1:nrow(X)){
+      tissues <- which(!is.na(Y[i,]))
+      for (j in tissues){
+        combined.base.X[cur.row,j] <- 1
+        cur.row <- cur.row + 1
+      }
+    }
+    combined.X <- combined.base.X
+    for (i in 2:ncol(X)){
+      combined.X <- cbind(combined.X, combined.base.X*do.call(c,lapply(1:nrow(X), function(j) rep((X[j,i]),sum(!is.na(Y[j,]))))))
+    }
+    combined.std <- sqrt(diag(vcov(lm(combined.Y~combined.X +0))))[(ntc-nt+1):ntc]
+    beta[,"StandardError"] <- beta[,"StandardError"]*separate.std/combined.std
+  }
+  zscores <- beta[,"Estimate"]/beta[,"StandardError"]
+  metazscores <- sapply(1:ncol(Y), function(i){
+    zscore <- zscores[i]
+    pval <- pt(abs(zscore),
+               df=(sum(!is.na(Y[,i])) - ncol(X)),
+               lower.tail = FALSE)
+    metazscore <- (zscore/abs(zscore))*abs(qnorm(pval))
+    return(metazscore)
+  })
+  beta[,"StandardError"] <- beta[,"Estimate"]/metazscores
+  return(list(beta=beta,corr=corr, sigmag=est.params$vg/(est.params$vg+est.params$ve)))
 }

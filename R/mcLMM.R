@@ -342,8 +342,29 @@ mc_remle <- function(Y, X){
   return(est.params)
 }
 
-meta_tissue <- function(Y, X, heuristic=FALSE, newRE=TRUE){
-  Y <- scale(Y)
+#' Ultra-fast meta-tissue algorithm
+#' 
+#' Provides identical results as meta-tissue in linear time with respect to
+#' the number of samples rather than cubic. Slight differences may be 
+#' due to different optimization algorithms of the same likelihood function.
+#' 
+#' @param expr Matrix with individuals as rows and tissues as columns. Missing
+#'          gene expression must be NA
+#' @param geno Vector of genotypes for each individual
+#' @param covs Matrix with individuals as rows and covariates as columns.
+#' @param heuristic Boolean. Uses heuristic for scaling standard errors. 
+#'                  increases sensitivity at the cost of higher FPR.
+#' @param newRE Boolean. Use new random effects model to perform meta
+#'              analyses as discussed in Sul et al.
+#' @return List of estimated coefficients \code{beta}, coefficient correlation
+#'         \code{corr}, and \code{sigma_g}. 
+meta_tissue <- function(expr, geno, covs=NULL, heuristic=FALSE, newRE=TRUE){
+  Y <- scale(expr)
+  X <- rep(1,nrow(Y))
+  if (!is.null(covs)){
+    X <- cbind(X, covs)
+  }
+  X <- cbind(X, geno)
   const <- get_constants(Y,X)
   ntc <- const$ntc
   nt <- const$nt
@@ -352,9 +373,6 @@ meta_tissue <- function(Y, X, heuristic=FALSE, newRE=TRUE){
   est.params <- remle_get_params_meta(d, const, newRE)
   beta <- est.params$coef
   corr <- est.params$b.cor
-  if (!newRE){
-    corr <- NULL
-  }
   if (heuristic){
     # Run separate OLS
     separate.std <- sapply(1:ncol(Y), function(i){

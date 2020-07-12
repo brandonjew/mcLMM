@@ -17,10 +17,11 @@ individuals and \code{c} covariates.}
 A list of named constants. These constants are difficult to
         describe briefly. See Jew et al, 2020 for a more in-depth 
         discussion of these constants. \code{ns} is the total number of 
-        measured responses. \code{ni} is the number of individuals.
-        \code{ntc} is the number of measurement contexts multiplied
-        by the number of covariates. \code{g.sizes} is a vector of 
-        the unique number of measurements across all individuals.
+        measured responses. \code{nt} is the number of contexts.
+        \code{ni} is the number of individuals. \code{nc} is the number
+        of covariates. \code{ntc} is the number of measurement contexts 
+        multiplied by the number of covariates. \code{g.sizes} is a vector
+        of the unique number of measurements across all individuals.
         \code{g.ind.sizes} is a vector of the number of individuals
         that have a certain number of measurements. \code{B} is a dummy
         matrix that will store the inverse of XHX (beta hat covariance).

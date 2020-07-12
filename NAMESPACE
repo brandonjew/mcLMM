@@ -2,3 +2,5 @@
 
 export(mc_mle)
 export(mc_remle)
+export(meta_tissue)
+export(simulate_data)

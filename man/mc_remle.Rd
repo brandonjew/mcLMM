@@ -4,7 +4,7 @@
 \alias{mc_remle}
 \title{Ultra-fast REMLE for multi-context LMM}
 \usage{
-mc_remle(Y, X, G = NULL)
+mc_remle(Y, X)
 }
 \arguments{
 \item{Y}{Matrix with individuals as rows and measurements as columns
@@ -12,13 +12,6 @@ Missing measurements must be NA}
 
 \item{X}{Matrix with \code{n} rows and \code{c} columns for \code{n}
 individuals and \code{c} covariates.}
-
-\item{G}{Matrix with \code{n} rows and \code{m} columns for \code{n}
-individuals and \code{m} covariates that will be marginally
-tested (A separate LMM will be fit for each column of G by 
-appending this column to X for each model). This provides
-a modest speedup compared to rerunning this function with
-each feature in G separately.}
 }
 \value{
 List of REMLE parameters in slots \code{delta}, \code{ve},

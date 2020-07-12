@@ -358,6 +358,7 @@ mc_remle <- function(Y, X){
 #'              analyses as discussed in Sul et al.
 #' @return List of estimated coefficients \code{beta}, coefficient correlation
 #'         \code{corr}, and \code{sigma_g}. 
+#' @export
 meta_tissue <- function(expr, geno, covs=NULL, heuristic=FALSE, newRE=TRUE){
   Y <- scale(expr)
   X <- rep(1,nrow(Y))

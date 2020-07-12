@@ -8,7 +8,7 @@ This term refers to a study design where multiple measurements are taken from th
 
 ### How fast is ultra-fast?
 
-The mcLMM optimization algorithm is specifically designed for LMMs with structured design matrices. We are able to estimate the optimal MLE and REMLE variance components in linear time. A naive LMM optimization algorithm is typically cubic in runtime. This means that we can process even the largest datasets in seconds rather than hours (or days sometimes). 
+The mcLMM optimization algorithm is specifically designed for LMMs with structured design matrices. We are able to estimate the optimal MLE and REMLE variance components in linear time with respect ot hte number of individuals. A naive LMM optimization algorithm is typically cubic in runtime. This means that we can process even the largest datasets in seconds rather than hours (or days sometimes). 
 
 ## Installation
 
@@ -22,16 +22,18 @@ devtools::install_github("brandonjew/mcLMM")
 
 ```r
 library(mcLMM)
+sim.data <- mcLMM::simulate_data(ni=100, context.weights=c(1, 0.9, 0.6),
+                                 var.e=0.2, var.g=0.4)
 ```
 
 mcLMM can provide the optimal MLE or REMLE variance components for a model as follows:
 
 ```r
-mdl <- mcLMM::mc_mle(Y, X)
+mle.mdl <- mcLMM::mc_mle(Y=sim.data$Y.mc, X=sim.data$X.mc)
 ```
 
 ```r
-mdl <- mcLMM::mc_remle(Y, X)
+remle.mdl <- mcLMM::mc_remle(Y=sim.data$Y.mc, X=sim.data$X.mc)
 ```
 
-where Y is the response variable encoded as a matrix with individuals as rows and contexts as columns, X is the covariate matrix with individuals as rows and covariates as columns. These functions return a list of the LMM parameters (variance components and estimated covariate coefficients with 'uncorrelated' standard errors)
+where Y is the response variable encoded as a matrix with individuals as rows and contexts as columns, X is the covariate matrix with individuals as rows and covariates as columns. These functions return a list of the LMM parameters (variance components and estimated covariate coefficients and coefficient correlations)

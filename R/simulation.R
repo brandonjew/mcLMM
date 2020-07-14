@@ -21,7 +21,7 @@
 #'  @param Sigma Covariance matrix
 #'  
 #'  @return MVN sample in \code{n} by \code{length(mu)} matrix
-mvrnorm <-
+mcmvrnorm <-
   function(n, mu, Sigma)
   {
     tol <- 1e-6
@@ -64,7 +64,12 @@ simulate_data <- function(ni, context.weights=NULL, var.e, var.g,
   context.weights <- c(1, context.weights)
   measurement.identities <- apply(do.call(cbind, 
                                           lapply(context.weights, function(p) {
-                                            rbinom(ni, 1, p) == 1
+                                            np <- round(ni*p)
+                                            x <- rep(FALSE, ni)
+                                            x.indices <- sample(1:ni, np)
+                                            x[x.indices] <- TRUE
+                                            return(x)
+                                            #rbinom(ni, 1, p) == 1
                                           })), 
                                   1, function(x) {which(x)})
   measurement.sizes <- sapply(measurement.identities, function(x){
@@ -99,7 +104,7 @@ simulate_data <- function(ni, context.weights=NULL, var.e, var.g,
   residuals <- do.call(c, lapply(names(group.sizes), function(group.size){
     ti <- as.numeric(group.size)
     sub.sigma <- (matrix(1,nrow=ti,ncol=ti) * var.g) + diag(var.e,ti)
-    as.vector(t(mvrnorm(n=group.sizes[group.size], mu=rep(0,ti),
+    as.vector(t(mcmvrnorm(n=group.sizes[group.size], mu=rep(0,ti),
                         Sigma=sub.sigma)))
   }))
   Y <- Y + residuals

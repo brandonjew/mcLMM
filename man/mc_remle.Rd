@@ -2,7 +2,7 @@
 % Please edit documentation in R/mcLMM.R
 \name{mc_remle}
 \alias{mc_remle}
-\title{Ultra-fast REMLE for multi-context LMM}
+\title{Efficient REMLE for multi-context LMM}
 \usage{
 mc_remle(Y, X)
 }
@@ -14,9 +14,9 @@ Missing measurements must be NA}
 individuals and \code{c} covariates.}
 }
 \value{
-List of REMLE parameters in slots \code{delta}, \code{ve},
+List of REMLE parameters in slots \code{coef}, \code{ve},
         and \code{vg}.
 }
 \description{
-Ultra-fast REMLE for multi-context LMM
+Efficient REMLE for multi-context LMM
 }

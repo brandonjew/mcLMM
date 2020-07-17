@@ -57,21 +57,24 @@ mcmvrnorm <-
 #'         \code{mc_remle} documentation for more details on mcLMM input.
 #' @export
 simulate_data <- function(ni, context.weights=NULL, var.e, var.g, 
-                          random.seed=42){
-  set.seed(random.seed)
+                          random.seed=NULL){
+  if (!is.null(random.seed)){
+    set.seed(random.seed)
+  }
   n.individuals <- ni
   n.measurements <- length(context.weights) + 1
   context.weights <- c(1, context.weights)
-  measurement.identities <- apply(do.call(cbind, 
-                                          lapply(context.weights, function(p) {
-                                            np <- round(ni*p)
-                                            x <- rep(FALSE, ni)
-                                            x.indices <- sample(1:ni, np)
-                                            x[x.indices] <- TRUE
-                                            return(x)
-                                            #rbinom(ni, 1, p) == 1
-                                          })), 
-                                  1, function(x) {which(x)})
+  measurement.identities <- do.call(cbind, lapply(context.weights, function(p){
+    np <- round(ni*p)
+    x <- rep(FALSE, ni)
+    x.indices <- sample(1:ni, np)
+    x[x.indices] <- TRUE
+    return(x)
+    #rbinom(ni, 1, p) == 1
+  }))
+  measurement.identities <- lapply(1:n.individuals, function(i){
+    which(measurement.identities[i,,drop=T])
+  })
   measurement.sizes <- sapply(measurement.identities, function(x){
     length(x)
   })

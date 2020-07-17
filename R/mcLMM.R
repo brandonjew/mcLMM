@@ -45,7 +45,7 @@ remle_nll <- function(d, const){
                   "Likely due to linearly dependent columns in X.\n",
                   "Original error message: ", err.msg)
            })
-  S <- prod(diag(B)^2) # Determinant of t(X)%*%solve(H)%*%X
+  S <- sum(2*log(diag(B))) # Determinant of t(X)%*%solve(H)%*%X
   B <- chol2inv(B)
   YHX <- sxy - colSums(gxsy/d.vec)
   YHY <- sy2 - sum(syi2g/d.vec)
@@ -55,7 +55,7 @@ remle_nll <- function(d, const){
     }))
   }))) 
   R = YHY - YHXBXHY
-  return((ns-ntc)*log(R) - ni*log(d) + sum(g.ind.sizes*log(d.vec)) + log(S))
+  return((ns-ntc)*log(R) - ni*log(d) + sum(g.ind.sizes*log(d.vec)) + S)
 }
 
 #' Calculate optimal variance component MLE estimates given delta
@@ -310,29 +310,54 @@ get_constants <- function(Y,X){
               b.names=b.names))
 }
 
-#' Ultra-fast MLE for multi-context LMM
+#' Ultra fast approximation for multi-context LMM
 #'
 #' @param Y Matrix with individuals as rows and measurements as columns
 #'          Missing measurements must be NA
 #' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
 #'          individuals and \code{c} covariates. 
-#' @return List of MLE parameters in slots \code{delta}, \code{ve},
+#' @return List of approximate MLE parameters in slots \code{ve},
+#'         and \code{vg}.
+mc_approx <- function(Y, X){
+  lm.residuals <- apply(Y, 2, function(Y.j){
+    indices <- !is.na(Y.j)
+    lm.residuals.j <- rep(NA, nrow(Y))
+    lm.residuals.j[indices] <- .lm.fit(x=X[indices,], y=Y.j[indices])$residuals
+    return(lm.residuals.j)
+  })
+  weights <- crossprod(!is.na(lm.residuals))
+  diag.weights <- diag(weights)
+  tri.weights <- weights[upper.tri(weights)]
+  sigma.hat <- var(lm.residuals, use="pairwise.complete.obs")
+  vepvg <- sum(diag(sigma.hat)*diag.weights, na.rm=TRUE)/sum(diag.weights)
+  vg <- sum(sigma.hat[upper.tri(sigma.hat)]*tri.weights)/sum(tri.weights)
+  ve <- vepvg-vg
+  return(list(vg=vg, ve=ve))
+}
+
+#' Efficient MLE for multi-context LMM
+#'
+#' @param Y Matrix with individuals as rows and measurements as columns
+#'          Missing measurements must be NA
+#' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
+#'          individuals and \code{c} covariates. 
+#' @return List of MLE parameters in slots \code{coef}, \code{ve},
 #'         and \code{vg}.
 #' @export
 mc_mle <- function(Y, X){
   const <- get_constants(Y,X)
-  d <- stats::optimize(f=mle_nll, interval=c(exp(-10), exp(10)), const)$minimum
+  d <- stats::optimize(f=mle_nll, interval=c(exp(-5), exp(10)), const)$minimum
   est.params <- mle_get_params(d, const)
   return(est.params)
 }
 
-#' Ultra-fast REMLE for multi-context LMM
+#' Efficient REMLE for multi-context LMM
 #'
 #' @param Y Matrix with individuals as rows and measurements as columns
 #'          Missing measurements must be NA
 #' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
 #'          individuals and \code{c} covariates. 
-#' @return List of REMLE parameters in slots \code{delta}, \code{ve},
+#' @return List of REMLE parameters in slots \code{coef}, \code{ve},
 #'         and \code{vg}.
 #' @export
 mc_remle <- function(Y, X){

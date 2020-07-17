@@ -4,7 +4,7 @@
 \alias{simulate_data}
 \title{Simulate test data for mcLMM}
 \usage{
-simulate_data(ni, context.weights = NULL, var.e, var.g, random.seed = 42)
+simulate_data(ni, context.weights = NULL, var.e, var.g, random.seed = NULL)
 }
 \arguments{
 \item{ni}{Number of individuals}

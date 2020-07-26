@@ -4,7 +4,14 @@
 \alias{meta_tissue}
 \title{Ultra-fast meta-tissue algorithm}
 \usage{
-meta_tissue(expr, geno, covs = NULL, heuristic = FALSE, newRE = TRUE)
+meta_tissue(
+  expr,
+  geno,
+  covs = NULL,
+  heuristic = FALSE,
+  newRE = TRUE,
+  force.iter = FALSE
+)
 }
 \arguments{
 \item{expr}{Matrix with individuals as rows and tissues as columns. Missing
@@ -19,6 +26,11 @@ increases sensitivity at the cost of higher FPR.}
 
 \item{newRE}{Boolean. Use new random effects model to perform meta
 analyses as discussed in Sul et al.}
+
+\item{force.iter}{Boolean. If TRUE, force iterative method even when there
+is no missing data. This is included for testing purposes
+only. The optimal non-iterative method for no missing data
+is exact and way faster.}
 }
 \value{
 List of estimated coefficients \code{beta}, coefficient correlation

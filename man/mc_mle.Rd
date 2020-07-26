@@ -4,7 +4,7 @@
 \alias{mc_mle}
 \title{Efficient MLE for multi-context LMM}
 \usage{
-mc_mle(Y, X)
+mc_mle(Y, X, force.iter = FALSE)
 }
 \arguments{
 \item{Y}{Matrix with individuals as rows and measurements as columns
@@ -12,6 +12,11 @@ Missing measurements must be NA}
 
 \item{X}{Matrix with \code{n} rows and \code{c} columns for \code{n}
 individuals and \code{c} covariates.}
+
+\item{force.iter}{Boolean. If TRUE, force iterative method even when there
+is no missing data. This is included for testing purposes
+only. The optimal non-iterative method for no missing data
+is exact and way faster.}
 }
 \value{
 List of MLE parameters in slots \code{coef}, \code{ve},

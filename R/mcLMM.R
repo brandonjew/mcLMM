@@ -90,7 +90,7 @@ mle_get_params <- function(d, const){
   colnames(B) <- b.names
   rownames(beta) <- b.names
   colnames(beta) <- c("Estimate", "StandardError")
-  return(list(ve=ve, vg=vg, coef=beta, b.cov=B))
+  return(list(ve=ve, vg=vg, coef=beta, b.cov=B*ve))
 }
 
 #' Calculate optimal variance component REMLE estimates given delta
@@ -105,8 +105,8 @@ mle_get_params <- function(d, const){
 remle_get_params <- function(d, const){
   list2env(const, env=environment())
   d.vec <- g.sizes + d
-  B[upper.tri(B, diag=TRUE)] <- E - colSums(D/d.vec)
   # We assume chol() only uses upper.tri (things will break if it doesn't)
+  B[upper.tri(B, diag=TRUE)] <- E - colSums(D/d.vec)
   B <- chol2inv(chol(B))
   YHX <- sxy - colSums(gxsy/d.vec)
   YHY <- sy2 - sum(syi2g/d.vec)
@@ -125,7 +125,7 @@ remle_get_params <- function(d, const){
   colnames(B) <- b.names
   rownames(beta) <- b.names
   colnames(beta) <- c("Estimate", "StandardError")
-  return(list(ve=ve, vg=vg, coef=beta, b.cor=cov2cor(B)))
+  return(list(ve=ve, vg=vg, coef=beta, b.cov=B*ve))
 }
 
 #' Calculate optimal variance component REMLE estimates given delta using Lin
@@ -171,6 +171,130 @@ remle_get_params_meta <- function(d, const, newRE=TRUE){
               b.cor=cov2cor(B)[(ntc-nt+1):ntc,(ntc-nt+1):ntc]))
 }
 
+#' Get LMM parameters for data with no missing values
+#' 
+#' @param Y Matrix with individuals as rows and measurements as columns
+#'          Missing measurements must be NA.
+#' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
+#'          individuals and \code{c} covariates. 
+#' @param REML Boolean for returning REML or ML estimates
+#' @return A list with ve in slot \code{ve}, vg in slot \code{vg}, 
+#'         estimated effect sizes and uncorrelated standard errors
+#'         in slot \code{coef}.
+full_get_params <- function(Y, X, REML=TRUE){
+  ni <- nrow(Y)
+  nt <- ncol(Y)
+  nc <- ncol(X)
+  covariate.names <- colnames(X)
+  context.names <- colnames(Y)
+  if (is.null(context.names)){
+    context.names <- paste0("T", 1:nt)
+  }
+  if (is.null(covariate.names)){
+    covariate.names <- paste0("C", 1:nc)
+  }
+  covariate.names <- paste0('[',covariate.names,']')
+  context.names <- paste0('[',context.names,']')
+  b.names <- unlist(lapply(covariate.names, function(covariate.name){
+    paste(covariate.name, context.names, sep=',')
+  }))
+  xtx.inv <- chol2inv(qr(X)$qr)
+  xtx.inv.xt <- tcrossprod(xtx.inv, X)
+  beta <- lapply(1:nt, function(ti){
+    xtx.inv.xt %*% Y[,ti]
+  })
+  s <- do.call(cbind, lapply(1:nt, function(ti){
+    as.vector(Y[,ti]) - as.vector(X %*% beta[[ti]])
+  }))
+  u <- sum(s^2)
+  v <- -sum(rowSums(s)^2)
+  beta <- unlist(beta)
+  d <- -((nt*u)+v)/(u+v)
+  beta.cov <- kronecker(matrix(1,nrow=nt,ncol=nt) + diag(d, nt), xtx.inv)
+  R <- (u/d) + (v/(d*(nt+d)))
+  if (REML){
+    vg <- R/((ni*nt)-(nt*nc))
+  }
+  else {
+    vg <- R/(ni*nt)
+  }
+  ve <- d * vg
+  beta.cov <- beta.cov*vg
+  beta.stderr <- sqrt(diag(beta.cov))
+  beta <- cbind(beta, beta.stderr)
+  # Permutation to sort by covariate rather than context
+  p <- sapply(1:(nt*nc), function(i){
+    covar <- ((i-1) %/% nt) +1
+    context <- ((i-1) %% nt)
+    context*nc + covar
+  })
+  beta <- beta[p,]
+  rownames(beta) <- b.names
+  colnames(beta) <- c("Estimate", "StandardError")
+  beta.cov <- beta.cov[p,]
+  beta.cov <- beta.cov[,p]
+  dimnames(beta.cov) <- list(b.names, b.names)
+  return(list(ve=ve,vg=vg, coef=beta, b.cov=beta.cov))
+}
+
+#' Get Meta-Tissue LMM parameters for data with no missing values
+#' 
+#' @param Y Matrix with individuals as rows and measurements as columns
+#'          Missing measurements must be NA.
+#' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
+#'          individuals and \code{c} covariates. 
+#' @param newRE Boolean. Return typical standard errors if TRUE. Otherwise,
+#'              returns 'uncorrelated' standard errors. 
+#' @return A list with ve in slot \code{ve}, vg in slot \code{vg}, 
+#'         estimated effect sizes and uncorrelated standard errors
+#'         in slot \code{coef}.
+full_get_params_meta <- function(Y, X, newRE=TRUE){
+  ni <- nrow(Y)
+  nt <- ncol(Y)
+  nc <- ncol(X)
+  covariate.name <- colnames(X)
+  context.names <- colnames(Y)
+  if (is.null(context.names)){
+    context.names <- paste0("T", 1:nt)
+  }
+  if (is.null(covariate.name)){
+    covariate.name <- paste0("C", 1:nc)
+  }
+  covariate.name <- paste0('[',covariate.name[length(covariate.name)],']')
+  context.names <- paste0('[',context.names,']')
+  b.names <- paste(covariate.name, context.names, sep=',')
+  xtx.inv <- chol2inv(qr(X)$qr)
+  xtx.inv.xt <- tcrossprod(xtx.inv, X)
+  beta <- lapply(1:nt, function(ti){
+    xtx.inv.xt %*% Y[,ti]
+  })
+  s <- do.call(cbind, lapply(1:nt, function(ti){
+    as.vector(Y[,ti]) - as.vector(X %*% beta[[ti]])
+  }))
+  u <- sum(s^2)
+  v <- -sum(rowSums(s)^2)
+  beta <- sapply(beta, function(beta.ti){
+    beta.ti[nc,]
+  })
+  d <- -((nt*u)+v)/(u+v) 
+  R <- (u/d) + (v/(d*(nt+d)))
+  vg <- R/((ni*nt)-(nt*nc))
+  ve <- d * vg
+  beta.cov <- matrix(xtx.inv[nc,nc]*vg, nrow=nt, ncol=nt)
+  diag(beta.cov) <- (1+d)*xtx.inv[nc,nc]*vg
+  if (newRE){
+    beta.stderr <- rep(sqrt(beta.cov[1,1]), nt)
+  }  
+  else {
+    beta.stderr <- rep(1/sqrt((1/(d*xtx.inv[nc,nc]*vg))*(1-(nt/(nt+d)))), nt)
+  }
+  beta <- cbind(beta, beta.stderr)
+  rownames(beta) <- b.names
+  colnames(beta) <- c("Estimate", "StandardError")
+  dimnames(beta.cov) <- list(b.names, b.names)
+  return(list(ve=ve,vg=vg, coef=beta, b.cor=cov2cor(beta.cov)))
+}
+
 #' Calculate constants independent of delta in MLE and REMLE likelihoods
 #' 
 #' @param Y Matrix with individuals as rows and measurements as columns
@@ -205,6 +329,17 @@ get_constants <- function(Y,X){
     stop("X and Y should have the same number of rows (1 per individual)")
   }
   ntc <- nt*nc
+
+  # given an index 1:nt, provides indices of individuals with this measurement
+  t.indices <- lapply(1:nt, function(ti){
+    ti.indices <- which(!is.na(Y[,ti]))
+    if (length(ti.indices) == 0){
+      stop("Detected measurement with no values ",
+           sprintf("Column %i is all NA and should be removed", ti))
+    }
+    return(ti.indices)
+  })
+  ns <- sum(sapply(1:nt, function(ti){length(t.indices[[ti]])}))
   covariate.names <- colnames(X)
   context.names <- colnames(Y)
   if (is.null(context.names)){
@@ -218,16 +353,6 @@ get_constants <- function(Y,X){
   b.names <- unlist(lapply(covariate.names, function(covariate.name){
     paste(covariate.name, context.names, sep=',')
   }))
-  # given an index 1:nt, provides indices of individuals with this measurement
-  t.indices <- lapply(1:nt, function(ti){
-    ti.indices <- which(!is.na(Y[,ti]))
-    if (length(ti.indices) == 0){
-      stop("Detected measurement with no values ",
-           sprintf("Column %i is all NA and should be removed", ti))
-    }
-    return(ti.indices)
-  })
-  ns <- sum(sapply(1:nt, function(ti){length(t.indices[[ti]])}))
   # sum of all responses squared
   sy2 <- 0
   # given index of individual provides sum of their responses
@@ -254,7 +379,7 @@ get_constants <- function(Y,X){
   g.ind.sizes <- sapply(g.sizes, function(g){length(g.indices[[g]])})
   syi2g <- syi2g[g.sizes]
   ng <- length(g.sizes)
-  # given row g in 1:ng and column i in 1:(nt*nc) , provides sum of covi*syi for 
+  # given row g in 1:ng and column i in 1:(nt*nc), provides sum of covi*syi for
   # each individual in group g
   gxsy <- do.call(rbind, lapply(g.sizes, function(g){
     sapply(1:(ntc), function(i){
@@ -310,44 +435,30 @@ get_constants <- function(Y,X){
               b.names=b.names))
 }
 
-#' Ultra fast approximation for multi-context LMM
-#'
-#' @param Y Matrix with individuals as rows and measurements as columns
-#'          Missing measurements must be NA
-#' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
-#'          individuals and \code{c} covariates. 
-#' @return List of approximate MLE parameters in slots \code{ve},
-#'         and \code{vg}.
-mc_approx <- function(Y, X){
-  lm.residuals <- apply(Y, 2, function(Y.j){
-    indices <- !is.na(Y.j)
-    lm.residuals.j <- rep(NA, nrow(Y))
-    lm.residuals.j[indices] <- .lm.fit(x=X[indices,], y=Y.j[indices])$residuals
-    return(lm.residuals.j)
-  })
-  weights <- crossprod(!is.na(lm.residuals))
-  diag.weights <- diag(weights)
-  tri.weights <- weights[upper.tri(weights)]
-  sigma.hat <- var(lm.residuals, use="pairwise.complete.obs")
-  vepvg <- sum(diag(sigma.hat)*diag.weights, na.rm=TRUE)/sum(diag.weights)
-  vg <- sum(sigma.hat[upper.tri(sigma.hat)]*tri.weights)/sum(tri.weights)
-  ve <- vepvg-vg
-  return(list(vg=vg, ve=ve))
-}
-
 #' Efficient MLE for multi-context LMM
 #'
 #' @param Y Matrix with individuals as rows and measurements as columns
 #'          Missing measurements must be NA
 #' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
-#'          individuals and \code{c} covariates. 
+#'          individuals and \code{c} covariates.
+#' @param force.iter Boolean. If TRUE, force iterative method even when there
+#'                   is no missing data. This is included for testing purposes
+#'                   only. The optimal non-iterative method for no missing data
+#'                   is exact and way faster. 
 #' @return List of MLE parameters in slots \code{coef}, \code{ve},
 #'         and \code{vg}.
 #' @export
-mc_mle <- function(Y, X){
-  const <- get_constants(Y,X)
-  d <- stats::optimize(f=mle_nll, interval=c(exp(-5), exp(10)), const)$minimum
-  est.params <- mle_get_params(d, const)
+mc_mle <- function(Y, X, force.iter=FALSE){
+  if (!force.iter & !anyNA(Y)){
+    message("No missing data. Performing optimal algorithm.")
+    est.params <- full_get_params(Y, X, REML=FALSE)
+  }
+  else {
+    const <- get_constants(Y,X)
+    d <- stats::optimize(f=mle_nll, interval=c(exp(-5), exp(10)),
+                         const)$minimum
+    est.params <- mle_get_params(d, const)
+  }
   return(est.params)
 }
 
@@ -356,14 +467,25 @@ mc_mle <- function(Y, X){
 #' @param Y Matrix with individuals as rows and measurements as columns
 #'          Missing measurements must be NA
 #' @param X Matrix with \code{n} rows and \code{c} columns for \code{n}
-#'          individuals and \code{c} covariates. 
+#'          individuals and \code{c} covariates.
+#' @param force.iter Boolean. If TRUE, force iterative method even when there
+#'                   is no missing data. This is included for testing purposes
+#'                   only. The optimal non-iterative method for no missing data
+#'                   is exact and way faster. 
 #' @return List of REMLE parameters in slots \code{coef}, \code{ve},
 #'         and \code{vg}.
 #' @export
-mc_remle <- function(Y, X){
-  const <- get_constants(Y,X)
-  d <- stats::optimize(f=remle_nll, interval=c(exp(-10), exp(10)), const)$minimum
-  est.params <- remle_get_params(d, const)
+mc_remle <- function(Y, X, force.iter=FALSE){
+  if (!force.iter & !anyNA(Y)){
+    message("No missing data. Performing optimal algorithm.")
+    est.params <- full_get_params(Y, X, REML=TRUE)
+  }
+  else {
+    const <- get_constants(Y,X)
+    d <- stats::optimize(f=remle_nll, interval=c(exp(-10), exp(10)),
+                         const)$minimum
+    est.params <- remle_get_params(d, const)
+  }
   return(est.params)
 }
 
@@ -381,52 +503,46 @@ mc_remle <- function(Y, X){
 #'                  increases sensitivity at the cost of higher FPR.
 #' @param newRE Boolean. Use new random effects model to perform meta
 #'              analyses as discussed in Sul et al.
+#' @param force.iter Boolean. If TRUE, force iterative method even when there
+#'                   is no missing data. This is included for testing purposes
+#'                   only. The optimal non-iterative method for no missing data
+#'                   is exact and way faster. 
 #' @return List of estimated coefficients \code{beta}, coefficient correlation
 #'         \code{corr}, and \code{sigma_g}. 
 #' @export
-meta_tissue <- function(expr, geno, covs=NULL, heuristic=FALSE, newRE=TRUE){
+meta_tissue <- function(expr, geno, covs=NULL, heuristic=FALSE, newRE=TRUE,
+                        force.iter=FALSE){
   Y <- scale(expr)
   X <- rep(1,nrow(Y))
   if (!is.null(covs)){
     X <- cbind(X, covs)
   }
   X <- cbind(X, geno)
-  const <- get_constants(Y,X)
-  ntc <- const$ntc
-  nt <- const$nt
-  nc <- const$nc
-  d <- stats::optimize(f=remle_nll, interval=c(exp(-10), exp(10)), const)$minimum
-  est.params <- remle_get_params_meta(d, const, newRE)
+  nt <- ncol(Y)
+  nc <- ncol(X)
+  ntc <- nt*nc
+  if (!force.iter & !anyNA(Y)){
+    message("No missing data. Performing optimal algorithm.")
+    est.params <- full_get_params_meta(Y, X, newRE)
+  }
+  else {
+    const <- get_constants(Y,X)
+    d <- stats::optimize(f=remle_nll, interval=c(exp(-10), exp(10)),
+                         const)$minimum
+    est.params <- remle_get_params_meta(d, const, newRE)
+  }
   beta <- est.params$coef
-  corr <- est.params$b.cor
   if (heuristic){
-    # Run separate OLS
-    separate.std <- sapply(1:ncol(Y), function(i){
-      separate.Y <- Y[,i]
-      indices <- !is.na(separate.Y)
-      separate.Y <- separate.Y[indices]
-      separate.X <- X[indices,,drop=F]
-      sqrt(diag(vcov(lm(separate.Y~separate.X +0))))[nc]
+    mdl.residuals <- lapply(1:nt, function(ti){
+      indices <- !is.na(Y[,ti,drop=T])
+      .lm.fit(x=X[indices,,drop=F], y=Y[indices,ti,drop=T])$residuals^2
     })
-    # Run combined OLS (This can probably be sped up with some same tricks used for EMMA)
-    combined.Y <- as.vector(t(Y))
-    combined.Y <- combined.Y[!is.na(combined.Y)]
-    combined.base.X <- matrix(0,nrow=length(combined.Y),ncol=ncol(Y))
-    cur.row <- 1
-    cur.col <- 1
-    for (i in 1:nrow(X)){
-      tissues <- which(!is.na(Y[i,]))
-      for (j in tissues){
-        combined.base.X[cur.row,j] <- 1
-        cur.row <- cur.row + 1
-      }
-    }
-    combined.X <- combined.base.X
-    for (i in 2:ncol(X)){
-      combined.X <- cbind(combined.X, combined.base.X*do.call(c,lapply(1:nrow(X), function(j) rep((X[j,i]),sum(!is.na(Y[j,]))))))
-    }
-    combined.std <- sqrt(diag(vcov(lm(combined.Y~combined.X +0))))[(ntc-nt+1):ntc]
-    beta[,"StandardError"] <- beta[,"StandardError"]*separate.std/combined.std
+    separate.se <- sapply(mdl.residuals, function(mdl.residual){
+      sqrt(sum(mdl.residual)/(length(mdl.residual)-ncol(X)))
+    })
+    mdl.residuals <- unlist(mdl.residuals)
+    combined.se <- sqrt(sum(mdl.residuals)/(length(mdl.residuals)-(ncol(X)*nt)))
+    beta[,"StandardError"] <- beta[,"StandardError"]*separate.se/combined.se
   }
   zscores <- beta[,"Estimate"]/beta[,"StandardError"]
   metazscores <- sapply(1:ncol(Y), function(i){
@@ -438,5 +554,6 @@ meta_tissue <- function(expr, geno, covs=NULL, heuristic=FALSE, newRE=TRUE){
     return(metazscore)
   })
   beta[,"StandardError"] <- beta[,"Estimate"]/metazscores
-  return(list(beta=beta,corr=corr, sigmag=est.params$vg/(est.params$vg+est.params$ve)))
+  return(list(beta=beta,corr=est.params$b.cor,
+              sigmag=est.params$vg/(est.params$vg+est.params$ve)))
 }

@@ -445,12 +445,15 @@ get_constants <- function(Y,X){
 #'                   is no missing data. This is included for testing purposes
 #'                   only. The optimal non-iterative method for no missing data
 #'                   is exact and way faster. 
+#' @param verbose Boolean. Output logging info.
 #' @return List of MLE parameters in slots \code{coef}, \code{ve},
 #'         and \code{vg}.
 #' @export
-mc_mle <- function(Y, X, force.iter=FALSE){
+mc_mle <- function(Y, X, force.iter=FALSE, verbose=TRUE){
   if (!force.iter & !anyNA(Y)){
-    message("No missing data. Performing optimal algorithm.")
+    if (verbose){
+      message("No missing data. Performing optimal algorithm.")
+    }
     est.params <- full_get_params(Y, X, REML=FALSE)
   }
   else {
@@ -472,12 +475,15 @@ mc_mle <- function(Y, X, force.iter=FALSE){
 #'                   is no missing data. This is included for testing purposes
 #'                   only. The optimal non-iterative method for no missing data
 #'                   is exact and way faster. 
+#' @param verbose Boolean. Output logging info.
 #' @return List of REMLE parameters in slots \code{coef}, \code{ve},
 #'         and \code{vg}.
 #' @export
-mc_remle <- function(Y, X, force.iter=FALSE){
+mc_remle <- function(Y, X, force.iter=FALSE, verbose=TRUE){
   if (!force.iter & !anyNA(Y)){
-    message("No missing data. Performing optimal algorithm.")
+    if (verbose){
+      message("No missing data. Performing optimal algorithm.")
+    }
     est.params <- full_get_params(Y, X, REML=TRUE)
   }
   else {
@@ -507,22 +513,25 @@ mc_remle <- function(Y, X, force.iter=FALSE){
 #'                   is no missing data. This is included for testing purposes
 #'                   only. The optimal non-iterative method for no missing data
 #'                   is exact and way faster. 
+#' @param verbose Boolean. Output logging info.
 #' @return List of estimated coefficients \code{beta}, coefficient correlation
 #'         \code{corr}, and \code{sigma_g}. 
 #' @export
 meta_tissue <- function(expr, geno, covs=NULL, heuristic=FALSE, newRE=TRUE,
-                        force.iter=FALSE){
+                        force.iter=FALSE, verbose=TRUE){
   Y <- scale(expr)
   X <- rep(1,nrow(Y))
   if (!is.null(covs)){
     X <- cbind(X, covs)
   }
-  X <- cbind(X, geno)
+  X <- as.matrix(cbind(X, geno))
   nt <- ncol(Y)
   nc <- ncol(X)
   ntc <- nt*nc
   if (!force.iter & !anyNA(Y)){
-    message("No missing data. Performing optimal algorithm.")
+    if (verbose){
+      message("No missing data. Performing optimal algorithm.")
+    }
     est.params <- full_get_params_meta(Y, X, newRE)
   }
   else {

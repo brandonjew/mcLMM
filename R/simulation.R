@@ -171,7 +171,7 @@ simulate_null_data <- function(ni, nc, var.e, var.g,
   }
   n.individuals <- ni
   n.measurements <- nc
-  sub.sigma <- matrix(var.g,nrow=n.measurements,ncol=n.measurements) + diag(var.e,n.measurements)
+  #sub.sigma <- matrix(var.g,nrow=n.measurements,ncol=n.measurements) + diag(var.e,n.measurements)
   #Y <- as.vector(mcmvrnorm(n=n.individuals, mu=rep(0,n.measurements), Sigma=sub.sigma))
   Y <- as.vector(fast_mcmvrnorm(n.individuals, n.measurements, var.e, var.g))
   tis <- unlist(lapply(1:n.individuals, function(x){

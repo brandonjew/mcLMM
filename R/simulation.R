@@ -35,26 +35,6 @@ mcmvrnorm <-
     if(n == 1) drop(X) else t(X)
   }
 
-#' Faster mvrnorm for Sigma=1*vg + I*ve
-#'
-#' Avoid eigen() since eigenvalues and eigenvectors are known
-#' However, eigenvectors still need to be orthonormalized.
-#' I'm assuming gramSchmidt() is faster than eigen()... hopefully.
-#'
-#' @return Transpose of what the normal mvrnorm returns.
-fast_mcmvrnorm <- 
-  function(n, t, ve, vg)
-  {
-    eigen.vectors <- diag(1,t)
-    eigen.vectors[1,] <- -1
-    eigen.vectors[,1] <- 1
-    eigen.vectors <- pracma::gramSchmidt(eigen.vectors)$Q
-    eigen.values <- c(t*vg + ve, rep(ve, t-1))
-    X <- matrix(rnorm(t * n), n)
-    X <- eigen.vectors %*% diag(sqrt(eigen.values)) %*% t(X)
-    if(n == 1) drop(X) else X
-  }
-
 #' Simulate test data for mcLMM
 #' 
 #' Simulates response Y under the mcLMM model with the given parameters.
@@ -171,9 +151,8 @@ simulate_null_data <- function(ni, nc, var.e, var.g,
   }
   n.individuals <- ni
   n.measurements <- nc
-  #sub.sigma <- matrix(var.g,nrow=n.measurements,ncol=n.measurements) + diag(var.e,n.measurements)
-  #Y <- as.vector(mcmvrnorm(n=n.individuals, mu=rep(0,n.measurements), Sigma=sub.sigma))
-  Y <- as.vector(fast_mcmvrnorm(n.individuals, n.measurements, var.e, var.g))
+  sub.sigma <- matrix(var.g,nrow=n.measurements,ncol=n.measurements) + diag(var.e,n.measurements)
+  Y <- as.vector(t(mcmvrnorm(n=n.individuals, mu=rep(0,n.measurements), Sigma=sub.sigma)))
   tis <- unlist(lapply(1:n.individuals, function(x){
     1:n.measurements
   }))

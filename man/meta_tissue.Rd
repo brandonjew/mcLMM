@@ -10,7 +10,8 @@ meta_tissue(
   covs = NULL,
   heuristic = FALSE,
   newRE = TRUE,
-  force.iter = FALSE
+  force.iter = FALSE,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ analyses as discussed in Sul et al.}
 is no missing data. This is included for testing purposes
 only. The optimal non-iterative method for no missing data
 is exact and way faster.}
+
+\item{verbose}{Boolean. Output logging info.}
 }
 \value{
 List of estimated coefficients \code{beta}, coefficient correlation

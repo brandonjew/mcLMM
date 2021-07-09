@@ -41,5 +41,5 @@ where Y is the response variable encoded as a matrix with individuals as rows an
 mcLMM also implements the Meta-Tissue meta-analytic framework. It can be called as follows
 
 ```r
-meta.mdl <- mcLMM:meta_tissue(expr=sim.data$Y.mc, geno=sim.data$X.mc[,"Genotype"])
+meta.mdl <- mcLMM::meta_tissue(expr=sim.data$Y.mc, geno=sim.data$X.mc[,"Genotype"])
 ```
